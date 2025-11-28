@@ -1,10 +1,13 @@
 package memtable
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/huandu/skiplist"
 )
+
+const MAX_SIZE = 256 // 256B for testing
 
 type Memtable struct {
 	mu   sync.RWMutex
@@ -46,4 +49,24 @@ func (m *Memtable) Size() int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.size
+}
+
+func (m *Memtable) Iterator() *skiplist.Element {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.data.Front()
+}
+
+func (m *Memtable) PrintInOrder() {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for e := m.data.Front(); e != nil; e = e.Next() {
+		fmt.Printf("Key: %s, Value: %s\n", e.Key(), e.Value)
+	}
+}
+
+func (m *Memtable) IsFull() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.size >= int64(MAX_SIZE)
 }

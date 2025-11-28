@@ -2,30 +2,34 @@ package wal
 
 import (
 	"encoding/binary"
+	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
 type WAL struct {
-	file *os.File
-	mu   sync.Mutex
+	file           *os.File
+	mu             sync.Mutex
+	path           string
+	sequenceNumber int64
 }
 
-func NewWAL(dir string) (*WAL, error) {
+func NewWAL(dir string, sequenceNumber int64) (*WAL, error) {
 	// Ensure the directory exists
-	err := os.MkdirAll(dir, 0755)
+	walDir := filepath.Join(dir, "wal")
+	err := os.MkdirAll(walDir, 0755)
 	if err != nil {
 		return nil, err
 	}
 
-	// Open file: Append mode, Create if missing, Write Only
-	path := dir + "/wal.log"
+	path := filepath.Join(walDir, fmt.Sprintf("wal-%04d.log", sequenceNumber))
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
 
-	return &WAL{file: f}, nil
+	return &WAL{file: f, path: path, sequenceNumber: sequenceNumber}, nil
 }
 
 func (w *WAL) Write(key, value []byte) error {
@@ -70,5 +74,12 @@ func (w *WAL) Write(key, value []byte) error {
 }
 
 func (w *WAL) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	return w.file.Close()
+}
+
+func (w *WAL) Delete() error {
+	w.Close()
+	return os.Remove(w.path)
 }
